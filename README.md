@@ -1,4 +1,4 @@
-# Talabat API
+# Buyverse API
 
 Production-ready e-commerce backend  
 built with **ASP.NET Core 8** • **Clean Architecture** • **Domain-Driven Design (DDD)**
