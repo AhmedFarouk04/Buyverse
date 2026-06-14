@@ -1,0 +1,12 @@
+**/bin/
+**/obj/
+.vs/
+.git/
+logs/
+TestResults/
+*.user
+*.suo
+*.mdf
+*.ldf
+*.sqlite
+*.db

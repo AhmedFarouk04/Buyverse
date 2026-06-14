@@ -6,6 +6,7 @@ using Talabat.APIs.Dtos;
 using Talabat.APIs.Errors;
 using Talabat.Core.Services;
 using Talabat.Core.Entities.Order_Aggregation;
+using Talabat.Core.Models;
 
 namespace Talabat.APIs.Controllers
 {
@@ -27,6 +28,8 @@ namespace Talabat.APIs.Controllers
         public async Task<ActionResult<Order>> CreateOrder(OrderDto orderDto)
         {
             var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            if (buyerEmail is null)
+                return Unauthorized();
 
             var address = mapper.Map<AddressDto, Address>(orderDto.ShippingAddress);
 
@@ -47,6 +50,8 @@ namespace Talabat.APIs.Controllers
         public async Task<ActionResult<IReadOnlyList<OrderToReturnDto>>> GetOrdersForUser()
         {
             var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            if (buyerEmail is null)
+                return Unauthorized();
 
             var orders = await orderService.GetOrdersForUserAsync(buyerEmail);
 
@@ -64,13 +69,15 @@ namespace Talabat.APIs.Controllers
         public async Task<ActionResult<Order>> GetOrderForUser(int id)
         {
             var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            if (buyerEmail is null)
+                return Unauthorized();
 
             var order = await orderService.GetOrderByIdForUserAsync(id, buyerEmail);
-            var mapperOrder = mapper.Map<Order, OrderToReturnDto>(order);
 
-            if (mapperOrder is null)
+            if (order is null)
                 return NotFound(new ApiErrorResponse(404));
 
+            var mapperOrder = mapper.Map<Order, OrderToReturnDto>(order);
             return Ok(mapperOrder);
         }
 
@@ -79,6 +86,18 @@ namespace Talabat.APIs.Controllers
         {
             var deliveryMethods = await orderService.GetDeliveryMethodsAsync();
             return Ok(deliveryMethods);
+        }
+
+        [HttpGet("summary")] // GET: /api/Orders/summary
+        [ProducesResponseType(typeof(OrderSummary), StatusCodes.Status200OK)]
+        public async Task<ActionResult<OrderSummary>> GetOrderSummary()
+        {
+            var buyerEmail = User.FindFirstValue(ClaimTypes.Email);
+            if (buyerEmail is null)
+                return Unauthorized();
+
+            var summary = await orderService.GetOrderSummaryForUserAsync(buyerEmail);
+            return Ok(summary);
         }
 
 

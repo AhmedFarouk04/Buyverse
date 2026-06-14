@@ -16,6 +16,7 @@ namespace Talabat.APIs.Extensions
             Services.AddScoped<IOrderService, OrderService>();
             Services.AddScoped<IUnitOfWork, UnitOfWork>();
             Services.AddScoped<IPaymentService, PaymentService>();
+            Services.AddScoped<IPaymentIntentService, StripePaymentIntentService>();
            //Unitofwork solve //Services.AddScoped(typeof(IGenericRepository<>), typeof(GenericRepository<>));
             Services.AddAutoMapper(typeof(MappingProfiles));
 
@@ -23,8 +24,9 @@ namespace Talabat.APIs.Extensions
             {
                 options.InvalidModelStateResponseFactory = actionContext =>
                 {
-                    var errors = actionContext.ModelState.Where(p => p.Value.Errors.Count() > 0)
-                        .SelectMany(p => p.Value.Errors)
+                    var errors = actionContext.ModelState
+                        .Where(p => p.Value?.Errors.Count > 0)
+                        .SelectMany(p => p.Value!.Errors)
                         .Select(E => E.ErrorMessage).ToArray();
 
                     var ValidationErrorResponse = new ApiValidationErrorResponse()

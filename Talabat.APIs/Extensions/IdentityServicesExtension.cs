@@ -35,19 +35,22 @@ namespace Talabat.APIs.Extensions
                  
                 .AddJwtBearer(options =>
                  {
+                     var issuer = configuration["JWT:ValidIssuer"] ?? throw new InvalidOperationException("JWT:ValidIssuer is missing");
+                     var audience = configuration["JWT:ValidAudience"] ?? throw new InvalidOperationException("JWT:ValidAudience is missing");
+                     var key = configuration["JWT:Key"] ?? throw new InvalidOperationException("JWT:Key is missing");
+
                      options.TokenValidationParameters = new TokenValidationParameters
                      {
                          ValidateIssuer = true,
-                         ValidIssuer = configuration["JWT:ValidIssuer"],
+                         ValidIssuer = issuer,
 
                          ValidateAudience = true,
-                         ValidAudience = configuration["JWT:ValidAudience"],
+                         ValidAudience = audience,
 
                          ValidateLifetime = true,
 
                          ValidateIssuerSigningKey = true,
-                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(configuration["JWT:Key"])
-                         )
+                         IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key))
                      };
                  });
 

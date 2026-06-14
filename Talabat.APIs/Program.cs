@@ -21,27 +21,44 @@ namespace Talabat.APIs
         public static async Task Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
+            var isTesting = builder.Environment.IsEnvironment("Testing");
 
 
             #region Configure Service work with Dependency Injection
             builder.Services.AddControllers();
             //--- DataBases
-            builder.Services.AddDbContext<StoreContext>(options =>
+            if (isTesting)
             {
-                options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+                builder.Services.AddDbContext<StoreContext>(options =>
+                {
+                    options.UseInMemoryDatabase("StoreContext_Testing");
+                });
+
+                builder.Services.AddDbContext<AppIdentityDbContext>(options =>
+                {
+                    options.UseInMemoryDatabase("AppIdentityDbContext_Testing");
+                });
             }
+            else
+            {
+                builder.Services.AddDbContext<StoreContext>(options =>
+                {
+                    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+                }
 
 
-          );
+              );
+                builder.Services.AddDbContext<AppIdentityDbContext>(options =>
+                {
+                options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityConnection")); }
+                );
+            }
             builder.Services.AddSingleton<IConnectionMultiplexer>(options =>
             {
-             var connection = builder.Configuration.GetConnectionString("Redis");
+             var connection = builder.Configuration.GetConnectionString("Redis")
+                ?? throw new InvalidOperationException("Redis connection string is missing");
                     return ConnectionMultiplexer.Connect(connection);
                });
-            builder.Services.AddDbContext<AppIdentityDbContext>(options =>
-            {
-            options.UseSqlServer(builder.Configuration.GetConnectionString("IdentityConnection")); }
-            );
            
             //----Extenstions Services 
             builder.Services.AddAppExtentionServices();
@@ -63,7 +80,8 @@ namespace Talabat.APIs
                 options.AddPolicy("MyPolicy", policy =>
                 {
                     policy
-                        .WithOrigins(builder.Configuration["FrontUrl"])
+                        .WithOrigins(builder.Configuration["FrontUrl"]
+                            ?? throw new InvalidOperationException("FrontUrl is missing"))
                         .AllowAnyHeader()
                         .AllowAnyMethod();
                         
@@ -75,27 +93,30 @@ namespace Talabat.APIs
             var app = builder.Build();
 
             #region Update-Database inside Main
-            var scope = app.Services.CreateScope();//all services scoped
-            var services = scope.ServiceProvider;//DI
-            //loogerfactory
-            var LoogerFactory = services.GetRequiredService<ILoggerFactory>();
-            try
+            if (!isTesting)
             {
-                var DbContext = services.GetRequiredService<StoreContext>();//Ask Clr to create Object
-                await DbContext.Database.MigrateAsync();//update database
-                await StoreContextSeed.SeedAsync(DbContext);
-                var identityDbContext = services.GetRequiredService<AppIdentityDbContext>();
+                var scope = app.Services.CreateScope();//all services scoped
+                var services = scope.ServiceProvider;//DI
+                //loogerfactory
+                var LoogerFactory = services.GetRequiredService<ILoggerFactory>();
+                try
+                {
+                    var DbContext = services.GetRequiredService<StoreContext>();//Ask Clr to create Object
+                    await DbContext.Database.MigrateAsync();//update database
+                    await StoreContextSeed.SeedAsync(DbContext);
+                    var identityDbContext = services.GetRequiredService<AppIdentityDbContext>();
 
-                await identityDbContext.Database.MigrateAsync();
-                var userManger = services.GetRequiredService<UserManager<AppUser>>();
-                await AppIdentityDbContextSeed.SeedUsersAsync(userManger);  
-            }
-            catch (Exception ex)
-            {
+                    await identityDbContext.Database.MigrateAsync();
+                    var userManger = services.GetRequiredService<UserManager<AppUser>>();
+                    await AppIdentityDbContextSeed.SeedUsersAsync(userManger);  
+                }
+                catch (Exception ex)
+                {
 
-                var Logger = LoogerFactory.CreateLogger<Program>();
-                Logger.LogError(ex, "an error Ocured  during apply the Migrations");
+                    var Logger = LoogerFactory.CreateLogger<Program>();
+                    Logger.LogError(ex, "an error Ocured  during apply the Migrations");
 
+                }
             }
             //i need object of dbcontext  fresh جاهز 
             // explixtity 
@@ -110,11 +131,17 @@ namespace Talabat.APIs
                 app.UseSwaggerMiddlware();  
             }
 
-            app.UseHttpsRedirection();
+            if (!isTesting)
+            {
+                app.UseHttpsRedirection();
+            }
 
             app.UseMiddleware<ExceptionMiddleware>();
 
-            app.UseStatusCodePagesWithRedirects("/errors/{0}");
+            if (!isTesting)
+            {
+                app.UseStatusCodePagesWithRedirects("/errors/{0}");
+            }
             app.UseCors("MyPolicy");  
             app.UseAuthentication();   
             app.UseAuthorization();
